@@ -17,3 +17,7 @@ builds
 
 # Backup files
 *~.nib
+
+# VPN
+*.ovpn
+credentials.txt
