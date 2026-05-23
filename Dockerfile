@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
-FROM --platform=linux/amd64 ubuntu:jammy
+FROM --platform=linux/amd64 ubuntu:focal
 
 ENV LC_ALL="C.UTF-8" \
     LANG="C.UTF-8" \
-    DOWNLOAD_URL="https://download.acestream.media/linux/acestream_3.2.11_ubuntu_22.04_x86_64_py3.10.tar.gz" \
-    CHECKSUM="9b6bbd76a55e5a434641afae3b9cf8e6154ce1cf392152ec3aed5ac265432b2e"
+    DOWNLOAD_URL="https://download.acestream.media/linux/acestream_3.2.11_ubuntu_18.04_x86_64_py3.8.tar.gz" \
+    CHECKSUM="363b9c45ec062a36bd73170c0c4927e582a532eee6e4884ab646b5d0d6e31ecf"
 
 # Install system packages (including openvpn for VPN support).
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked\
@@ -12,7 +12,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked\
     --mount=type=tmpfs,target=/tmp\
     set -ex;\
     apt-get update;\
-    apt-get install -yq --no-install-recommends ca-certificates python3.10 libpython3.10 python3-pip wget curl openvpn iproute2 iptables;\
+    apt-get install -yq --no-install-recommends ca-certificates python3.8 libpython3.8 python3-pip wget curl openvpn iproute2 iptables;\
     mkdir -p /opt/acestream;\
     wget --no-verbose --output-document /opt/acestream/acestream.tgz $DOWNLOAD_URL;\
     echo "$CHECKSUM /opt/acestream/acestream.tgz" | sha256sum --check;\
