@@ -1,6 +1,38 @@
 #!/bin/bash
 set -e
 
+# Create /dev/disk/by-id to silence AceStream disk lookup warnings
+mkdir -p /dev/disk/by-id
+
+get_external_ip() {
+    local response
+
+    if response=$(curl -4fsS --max-time 5 "https://ifconfig.co/json" 2>/dev/null); then
+        EXTERNAL_IP=$(printf '%s' "$response" | sed -n 's/.*"ip"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        EXTERNAL_ASN_ORG=$(printf '%s' "$response" | sed -n 's/.*"asn_org"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        EXTERNAL_COUNTRY=$(printf '%s' "$response" | sed -n 's/.*"country"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        EXTERNAL_CITY=$(printf '%s' "$response" | sed -n 's/.*"city"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+        if [ -n "$EXTERNAL_IP" ]; then
+            printf '%s|%s|%s|%s\n' "$EXTERNAL_IP" "$EXTERNAL_ASN_ORG" "$EXTERNAL_COUNTRY" "$EXTERNAL_CITY"
+            return 0
+        fi
+    fi
+
+    for response in \
+        "$(curl -4fsS --max-time 5 "https://ifconfig.me/ip" 2>/dev/null || true)" \
+        "$(curl -4fsS --max-time 5 "https://api.ipify.org" 2>/dev/null || true)" \
+        "$(curl -4fsS --max-time 5 "https://icanhazip.com" 2>/dev/null || true)"
+    do
+        EXTERNAL_IP=$(printf '%s' "$response" | tr -d '\r\n')
+        if [ -n "$EXTERNAL_IP" ]; then
+            printf '%s\n' "$EXTERNAL_IP"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # Start OpenVPN in the background if config exists
 if [ -f /etc/openvpn/pia.ovpn ]; then
     echo "[entrypoint] Starting OpenVPN..."
@@ -41,6 +73,21 @@ if [ -f /etc/openvpn/pia.ovpn ]; then
             # Update DNS to PIA's DNS servers
             echo "[entrypoint] Updating DNS to PIA DNS servers..."
             printf 'nameserver 10.0.0.241\nnameserver 1.1.1.1\n' > /etc/resolv.conf
+
+            if EXTERNAL_INFO=$(get_external_ip); then
+                IFS='|' read -r EXTERNAL_IP EXTERNAL_ASN_ORG EXTERNAL_COUNTRY EXTERNAL_CITY <<EOF
+$EXTERNAL_INFO
+EOF
+                echo "[entrypoint] VPN external IP: $EXTERNAL_IP"
+                if [ -n "$EXTERNAL_ASN_ORG" ]; then
+                    echo "[entrypoint] VPN external ASN org: $EXTERNAL_ASN_ORG"
+                fi
+                if [ -n "$EXTERNAL_COUNTRY" ] || [ -n "$EXTERNAL_CITY" ]; then
+                    echo "[entrypoint] VPN external location: ${EXTERNAL_CITY:-unknown city}, ${EXTERNAL_COUNTRY:-unknown country}"
+                fi
+            else
+                echo "[entrypoint] WARNING: Could not determine VPN external IP."
+            fi
 
             break
         fi
